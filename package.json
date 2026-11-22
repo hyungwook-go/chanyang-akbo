@@ -8,6 +8,7 @@
     "test": "node --test tests/",
     "dev": "node tools/serve.mjs",
     "icons": "node tools/make-icons.mjs",
-    "password": "node tools/set-password.mjs"
+    "password": "node tools/set-password.mjs",
+    "publish": "npm test && git subtree push --prefix public origin gh-pages"
   }
 }
