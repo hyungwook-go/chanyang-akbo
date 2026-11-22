@@ -49,17 +49,18 @@ export function askPassword() {
         <img src="icons/icon-192.png" alt="" width="72" height="72">
         <h1>찬양팀 악보</h1>
         <p>처음 한 번만 비밀번호를 넣어 주세요.<br>비밀번호는 찬양팀 담당자에게 물어보세요.</p>
-        <input type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="비밀번호" aria-label="비밀번호">
+        <input type="text" class="masked" name="team-code" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="비밀번호" aria-label="비밀번호">
         <label class="gateshow"><input type="checkbox"> 비밀번호 보이기</label>
         <div class="gatemsg" role="alert"></div>
         <button class="btn primary big" type="submit">확인</button>
         <footer>© 2026 HM KOREA Lyoo Hyung Wook. All Rights Reserved.</footer>
       </form>`;
     const form = box.querySelector('form');
-    const input = box.querySelector('input[type=password]');
+    // 아이패드·아이폰은 type=password 칸에서 한글 자판을 막으므로, 일반 글자 칸에 점(●)으로 가려 보이게 함
+    const input = box.querySelector('input.masked');
     const msg = box.querySelector('.gatemsg');
     const btn = box.querySelector('button');
-    box.querySelector('.gateshow input').addEventListener('change', (e) => { input.type = e.target.checked ? 'text' : 'password'; });
+    box.querySelector('.gateshow input').addEventListener('change', (e) => { input.classList.toggle('masked', !e.target.checked); });
     let tries = 0;
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
