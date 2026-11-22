@@ -217,7 +217,8 @@ body.viewing { overflow: hidden; }
 .gatebox img { align-self: center; border-radius: 16px; }
 .gatebox h1 { margin: 0; font-size: 24px; color: var(--accent); }
 .gatebox p { margin: 0; color: var(--sub); font-size: 15px; line-height: 1.5; }
-.gatebox input[type=password], .gatebox input[type=text] { font: inherit; font-size: 18px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; text-align: center; }
+.gatebox input[type=text] { font: inherit; font-size: 18px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; text-align: center; }
 .gateshow { font-size: 14px; color: var(--sub); display: flex; gap: 6px; align-items: center; justify-content: center; }
 .gatemsg { min-height: 20px; font-size: 14px; color: var(--danger); }
 .gatebox footer { margin-top: 6px; font-size: 11px; color: var(--sub); }
+.gatebox input.masked { -webkit-text-security: disc; text-security: disc; }
