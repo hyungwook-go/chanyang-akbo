@@ -2,7 +2,7 @@
 // 인터넷이 되면 항상 최신 파일을 먼저 쓰므로, 앱을 한 번만 다시 열면 새 버전이 보입니다.
 // 인터넷이 없거나 응답이 늦으면(3초) 보관해 둔 파일로 엽니다.
 const PREFIX = 'chanyang-akbo-';   // GitHub Pages는 같은 계정의 다른 사이트와 보관함을 함께 쓰므로, 이 앱 것만 다룹니다
-const VERSION = PREFIX + 'v1.0.2';
+const VERSION = PREFIX + 'v1.0.3';
 const WAIT = 3000;
 const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
@@ -30,8 +30,10 @@ self.addEventListener('fetch', (e) => {
 async function networkFirst(e) {
   const req = e.request;
   const cache = await caches.open(VERSION);
+  // GitHub Pages는 파일을 10분쯤 임시로 기억하므로, 매번 '바뀐 게 있나' 직접 물어봄 (바뀐 게 없으면 아주 짧게 끝남)
+  const fresh = req.mode === 'navigate' ? new Request(req.url, { cache: 'no-cache', credentials: 'same-origin' }) : new Request(req, { cache: 'no-cache' });
   // 받으면 보관본도 새로 바꿔 둠 (늦게 와도 다음을 위해 저장)
-  const net = fetch(req).then((res) => {
+  const net = fetch(fresh).then((res) => {
     if (res.ok) e.waitUntil(cache.put(req, res.clone()));
     return res;
   });

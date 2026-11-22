@@ -9,7 +9,7 @@ import { sundayOf, sundayName, listDate, needsNewWeek, startEntries, photosToDro
 import { guardBack } from './back.mjs';
 import { unlocked, askPassword, showInstallOnly } from './gate.mjs';
 
-window.AKBO_VERSION = '1.0.2';
+window.AKBO_VERSION = '1.0.3';
 const main = document.getElementById('main');
 const LS_TAB = 'chanyang.tab', LS_LIST = 'chanyang.list', LS_INSTALL = 'chanyang.install', LS_WELCOME = 'chanyang.welcome';
 let tab = localStorage.getItem(LS_TAB) === 'library' ? 'library' : 'order';
@@ -1126,7 +1126,7 @@ async function start() {
   });
 
   if ('serviceWorker' in navigator && location.hostname !== 'localhost') {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
   }
 }
 start();
