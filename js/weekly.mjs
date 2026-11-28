@@ -44,13 +44,13 @@ export function weekStart(today = new Date()) {
   return new Date(y, m - 1, d - 6).getTime();
 }
 
-// 앱 안의 악보 사진 사본 중 지울 곡들: 매주 고정곡, 이번 주(또는 앞으로의) 순서에 든 곡, 이번 주에 고른 사진은 남깁니다.
+// 앱 안의 악보 사진 사본 중 지울 곡들.
+// 남기는 것: 매주 고정곡, 남아 있는 예배 순서(지난 순서 포함, 8주까지)에 든 곡, 이번 주에 고른 사진.
+// 어느 순서에도 없고 지난주 전에 고른 사진만 지웁니다. (순서에 있는 곡이 '사진 없음'이 되지 않게)
 // photos: [{song, at}]  (at = 사진을 고른 시각)
 export function photosToDrop(songs, lists, photos, today = new Date()) {
-  const want = sundayOf(today);
   const keep = new Set(songs.filter((s) => s.fixed).map((s) => s.id));
-  // 특별 예배 순서에 든 곡은 그 순서를 지울 때까지 남김
-  for (const l of lists) if (l.special || listDate(l) >= want) for (const e of l.entries || []) keep.add(e.song);
+  for (const l of lists) for (const e of l.entries || []) keep.add(e.song);
   const since = weekStart(today);
   return photos.filter((p) => !keep.has(p.song) && (p.at || 0) < since).map((p) => p.song);
 }
