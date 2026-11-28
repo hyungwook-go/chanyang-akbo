@@ -94,21 +94,14 @@ test('새 순서: 고정곡이 자동으로 들어가고, 지난주 차례를 �
   assert.deepEqual(startEntries([{ id: 'a', fixed: 'end' }], [], uid).map((e) => e.song), ['a']);
 });
 
-import { photosToDrop, oldLists, weekStart } from '../public/js/weekly.mjs';
+import { oldLists, weekStart } from '../public/js/weekly.mjs';
 
-test('어느 순서에도 없는 곡의 사진만 정리 (고정곡·지난 순서 포함 모든 순서·이번 주에 고른 사진은 남김)', () => {
-  const today = new Date(2026, 10, 24); // 화, 이번 주일 11/29
-  const songs = [{ id: 'pin', fixed: true }, { id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
-  const lists = [{ date: '2026-11-22', entries: [{ song: 'a' }, { song: 'b' }] }, { date: '2026-11-29', entries: [{ song: 'b' }] }];
-  const old = new Date(2026, 10, 18).getTime();
-  const photos = [{ song: 'pin', at: old }, { song: 'a', at: old }, { song: 'b', at: old }, { song: 'c', at: old }, { song: 'd', at: new Date(2026, 10, 23, 9).getTime() }];
-  assert.deepEqual(photosToDrop(songs, lists, photos, today), ['c']);   // a는 지난주 순서에 있어 남김
-  // 한 주가 지나 새 순서(고정곡만)가 생겨도, 지난주 순서의 곡은 '사진 없음'이 되지 않음
-  const next = new Date(2026, 10, 30); // 월, 이번 주일 12/6
-  const withNew = [...lists, { date: '2026-12-06', entries: [{ song: 'pin' }] }];
-  assert.deepEqual(photosToDrop(songs, withNew, photos, next), ['c', 'd']);   // d는 지난주에 골랐고 어느 순서에도 없음
-  // 8주가 지나 지난 순서가 정리되면 그때 사진도 정리
-  assert.deepEqual(photosToDrop(songs, [withNew[2]], photos, next).sort(), ['a', 'b', 'c', 'd']);
+test('주가 바뀌어도 악보함 곡의 사진은 저절로 지우지 않음', async () => {
+  const w = await import('../public/js/weekly.mjs');
+  assert.equal(w.photosToDrop, undefined);
+  const app = readFileSync(new URL('../public/js/app.mjs', import.meta.url), 'utf8');
+  const tick = app.slice(app.indexOf('async function weekTick'), app.indexOf('async function setFixed'));
+  assert.ok(!/dropImages|remove\('g_'/.test(tick));   // 주 바뀜 처리에서 곡 사진을 지우지 않음
   assert.equal(weekStart(new Date(2026, 10, 22)), new Date(2026, 10, 16).getTime());
 });
 
@@ -145,7 +138,6 @@ test('특별 예배: 매주 순서 계산·8주 정리에서 빠지고, 그 곡 
   assert.equal(needsNewWeek([special], today), true);                 // 특별 예배만 있으면 이번 주 순서는 따로 필요
   assert.deepEqual(oldLists([special], today), []);                   // 오래돼도 자동으로 지우지 않음
   const old = new Date(2026, 10, 1).getTime();
-  assert.deepEqual(photosToDrop([{ id: 'e' }, { id: 'f' }], [special], [{ song: 'e', at: old }, { song: 'f', at: old }], today), ['f']);
 });
 
 import { binarize } from '../public/js/ocr.mjs';
