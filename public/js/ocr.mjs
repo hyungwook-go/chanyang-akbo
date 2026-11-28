@@ -45,6 +45,11 @@ function loadImage(blob) {
 // 악보 사진(여백을 잘라 낸 것)에서 제목을 읽어 돌려줍니다. 못 읽으면 ''.
 // frac: 그림의 위쪽 몇 %를 볼지 (제목 부분 사본을 줄 때는 그에 맞춰 더 크게)
 export async function readTitle(blob, frac = TOP) {
+  return (await readHead(blob, frac)).title;
+}
+
+// 제목 줄과, 사진 위쪽에서 읽은 글 전부 { title, text } (악보함의 곡과 맞출 때 씀)
+export async function readHead(blob, frac = TOP) {
   const worker = await getWorker();
   const img = await loadImage(blob);
   const sw = img.naturalWidth, sh = Math.max(1, Math.round(img.naturalHeight * Math.min(1, frac)));
@@ -60,13 +65,17 @@ export async function readTitle(blob, frac = TOP) {
   try {
     // 1차: 그림자·누런 바탕·오선을 걷어 낸 흑백 사진으로 읽기
     ctx.putImageData(cleanImage(original), 0, 0);
-    let title = pickTitle(linesOf((await worker.recognize(c)).data));
+    let lines = linesOf((await worker.recognize(c)).data);
+    let title = pickTitle(lines);
+    let text = lines.map((l) => l.text || '').join(' ');
     // 2차: 못 읽었으면 원래 사진으로 한 번 더
     if (!title) {
       ctx.putImageData(original, 0, 0);
-      title = pickTitle(linesOf((await worker.recognize(c)).data));
+      lines = linesOf((await worker.recognize(c)).data);
+      title = pickTitle(lines);
+      text += ' ' + lines.map((l) => l.text || '').join(' ');
     }
-    return title;
+    return { title, text: text.slice(0, 300) };
   } finally {
     c.width = 0; c.height = 0;
   }

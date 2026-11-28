@@ -186,3 +186,24 @@ test('처음 비밀번호: 정해져 있고, 같은 비밀번호는 같은 값·
   const dir = new URL('../public/js/', import.meta.url);
   for (const f of readdirSync(dir)) assert.doesNotMatch(readFileSync(new URL(f, dir), 'utf8'), /password\s*[:=]\s*['"]/i, f);
 });
+
+import { matchSong } from '../public/js/search.mjs';
+
+test('글자 인식이 조금 틀려도 악보함의 곡과 맞춤', () => {
+  const songs = ['주님의 영광 나타나셨네', '나 같은 죄인 살리신', '은혜 아니면', '내 영혼이 은총 입어', '주 하나님 지으신 모든 세계', 'Way Maker', '주의 은혜라', '주 은혜임을']
+    .map((title, i) => ({ id: 's' + i, title }));
+  const m = (title, text = '') => matchSong({ title, text }, songs)?.song.title || null;
+  assert.equal(m('주님의 엉광 나타나셧네'), '주님의 영광 나타나셨네');
+  assert.equal(m('내 영흔이 온총 입어'), '내 영혼이 은총 입어');
+  assert.equal(m('Way Makcr'), 'Way Maker');
+  assert.equal(m('주님의 엉광 LIE'), '주님의 영광 나타나셨네');   // 뒷부분을 엉뚱하게 읽어도
+  assert.equal(m('나 같은 죄'), '나 같은 죄인 살리신');           // 앞부분만 읽혀도
+  assert.equal(m('은혜'), null);                                  // 너무 짧은 조각은 맞추지 않음 (여러 곡에 들어 있음)
+  assert.equal(m('주의 은혜리'), '주의 은혜라');
+  assert.equal(m('C 4/4 작사 홍길동', '주 하나님 지으신 모든 새계 작곡'), '주 하나님 지으신 모든 세계');   // 제목 줄을 잘못 골라도 찾음
+  assert.equal(m('ㅁ;ㅣ ㅇ ㅁ', ' ~ 1 2 ]'), null);           // 알아볼 수 없으면 맞추지 않음
+  assert.equal(m('완전히 다른 새 노래'), null);                // 악보함에 없는 곡은 새 곡
+  // 비슷한 두 곡 중에는 사진이 없는 곡을 먼저
+  const two = [{ id: 'a', title: '주의 은혜', pages: ['p'] }, { id: 'b', title: '주의 은혜라', pages: [] }];
+  assert.equal(matchSong({ title: '주의 은혜리' }, two, (s) => !s.pages.length).song.id, 'b');
+});

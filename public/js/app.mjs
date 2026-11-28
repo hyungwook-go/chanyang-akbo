@@ -1,19 +1,20 @@
 // 찬양팀 악보 (배포용) — 화면 (예배 순서 / 악보함 / 등록·편집 / 설정)
 import * as store from './store.mjs';
 import * as db from './db.mjs';
-import { searchSongs, normalize } from './search.mjs';
-import { readTitle, warmUp } from './ocr.mjs';
+import { searchSongs, normalize, matchSong } from './search.mjs';
+import { readHead, warmUp } from './ocr.mjs';
 import { processFile, HEAD } from './image.mjs';
 import { openViewer, forgetImage } from './viewer.mjs';
 import { sundayOf, sundayName, listDate, needsNewWeek, startEntries, oldLists } from './weekly.mjs';
 import { guardBack } from './back.mjs';
 import { unlocked, askPassword, showInstallOnly } from './gate.mjs';
 
-window.AKBO_VERSION = '1.0.6';
+window.AKBO_VERSION = '1.0.7';
 const main = document.getElementById('main');
 const LS_TAB = 'chanyang.tab', LS_LIST = 'chanyang.list', LS_INSTALL = 'chanyang.install', LS_WELCOME = 'chanyang.welcome';
 let tab = localStorage.getItem(LS_TAB) === 'library' ? 'library' : 'order';
 let libQuery = '';
+let libMissingOnly = false;   // 악보함에서 사진 없는 곡만 보기
 let viewerOpen = false;
 
 const ICON = {
@@ -438,6 +439,7 @@ function renderLibrary() {
         <button class="btn primary" data-act="new-song">${ICON.plus} 새 악보 등록</button>
       </div>
       <div class="count" id="libCount"></div>
+      <div id="libMissing"></div>
       <div class="rows" id="libResults"></div>`;
     const input = main.querySelector('#libSearch');
     input.value = libQuery;
@@ -450,8 +452,16 @@ function renderLibResults() {
   const box = main.querySelector('#libResults');
   if (!box) return;
   const songs = allSongs();
-  const found = searchSongs(songs, libQuery);
-  main.querySelector('#libCount').textContent = libQuery ? `${found.length}곡 찾음 (전체 ${songs.length}곡)` : `악보 ${songs.length}곡`;
+  const missing = songs.filter((s) => !s.pages.length).length;
+  if (!missing) libMissingOnly = false;
+  // 사진이 없는 곡: 사진첩에서 여러 장을 한꺼번에 고르면 제목을 읽어 알아서 각 곡에 넣음
+  main.querySelector('#libMissing').innerHTML = missing ? `<div class="card missingbox">
+      <div><b>사진이 없는 곡 ${missing}곡</b><br><span class="small muted">사진첩에서 악보 사진을 <b>여러 장 한꺼번에</b> 고르면, 제목을 읽어 맞는 곡에 알아서 넣습니다.</span></div>
+      <div class="missingbtns"><button class="btn primary" data-act="relink">사진 한꺼번에 넣기</button>
+      <button class="btn" data-act="missing-only">${libMissingOnly ? '전체 곡 보기' : '사진 없는 곡만 보기'}</button></div>
+    </div>` : '';
+  const found = searchSongs(libMissingOnly ? songs.filter((s) => !s.pages.length) : songs, libQuery);
+  main.querySelector('#libCount').textContent = libQuery || libMissingOnly ? `${found.length}곡 ${libMissingOnly ? '(사진 없는 곡) ' : ''}(전체 ${songs.length}곡)` : `악보 ${songs.length}곡`;
   box.innerHTML = found.length
     ? found.map((s) => songRow(s, { right: `<button class="addbtn" data-act="add-one">＋ 순서에</button><button class="iconbtn" data-act="song-menu" aria-label="더보기">${ICON.more}</button>` })).join('')
     : `<div class="empty card">${songs.length ? '찾는 곡이 없습니다. <b>새 악보 등록</b>으로 추가하세요.' : '담당자가 <b>카카오톡</b>으로 보낸 악보 사진을 먼저 <b>사진첩(갤러리)에 저장</b>하세요.<br>그다음 <b>새 악보 등록</b>을 눌러 여러 장을 한꺼번에 고르면 제목을 자동으로 읽어 넣습니다.'}</div>`;
@@ -500,7 +510,8 @@ main.addEventListener('click', async (e) => {
     render();
     toast(s.fixed ? '고정을 풀었습니다' : '📌 고정했습니다 — 다음 주에도 자동으로 들어갑니다');
   }
-  else if (act === 'new-song') startNewSongs();
+  else if (act === 'new-song' || act === 'relink') startNewSongs();
+  else if (act === 'missing-only') { libMissingOnly = !libMissingOnly; renderLibResults(); }
 });
 
 // 순서 끌어 옮기기 (☰ 손잡이)
@@ -662,9 +673,11 @@ function openBatch(files, opts = {}) {
   const cards = files.map(() => ({ id: null, title: '', touched: false, join: false, dropped: false, done: false }));
   let saved = false, closed = false;
   const sh = openSheet(`새 악보 등록 · 사진 ${files.length}장`, `
-    <p class="small muted" style="margin:0 0 12px">사진 맨 위의 제목을 자동으로 읽어 넣습니다. 틀린 제목은 눌러서 고쳐 주세요.
+    <p class="small muted" style="margin:0 0 12px">사진 맨 위의 제목을 자동으로 읽어 넣습니다. <b>악보함에 이미 있는 곡</b>은 글자가 조금 틀리게 읽혀도 그 곡으로 맞춰 사진을 넣습니다.
+    틀린 제목은 눌러서 고쳐 주세요. 앞 글자 몇 개만 치면 악보함의 곡 이름이 나옵니다.
     2쪽 이상인 곡은 둘째 장에서 <b>앞 곡에 이어 붙이기</b>를 누르세요.</p>
     <div class="bprog"><div class="bprogtext">사진 준비 중…</div><div class="bar"><i></i></div></div>
+    <datalist id="bsongs">${allSongs().map((s) => `<option value="${esc(s.title)}">`).join('')}</datalist>
     <div class="batch">${cards.map((c, i) => `
       <div class="bcard" data-i="${i}">
         <button class="bstrip hidden" data-act="preview" aria-label="크게 보기"><span>눌러서 크게 보기</span></button>
@@ -672,7 +685,7 @@ function openBatch(files, opts = {}) {
         <button class="bthumb" data-act="preview" aria-label="크게 보기"></button>
         <div class="bmain">
           <div class="bjoin hidden">↑ 앞 곡의 다음 쪽</div>
-          <input class="btitle" placeholder="사진 준비 중…" autocomplete="off" autocorrect="off" spellcheck="false">
+          <input class="btitle" list="bsongs" placeholder="사진 준비 중…" autocomplete="off" autocorrect="off" spellcheck="false">
           <div class="bnote small muted"></div>
         </div>
         <div class="bside">
@@ -722,7 +735,9 @@ function openBatch(files, opts = {}) {
       if (!c.done) { note.textContent = ''; return; }
       const ex = existingFor(c.title);
       const pages = h.pages.length > 1 ? ` · ${h.pages.length}쪽` : '';
-      note.textContent = !c.title.trim() ? '제목을 입력해 주세요' : ex ? `이미 있는 곡 — 사진만 새 것으로 바꿉니다${pages}` : `새 곡${pages}`;
+      const auto = ex && c.readAs && !c.touched ? ` (읽은 글자 ‘${c.readAs}’ → 비슷한 곡으로 맞춤)` : '';
+      note.textContent = !c.title.trim() ? '제목을 입력해 주세요'
+        : ex ? `이미 있는 곡 — ${ex.pages.length ? '사진만 새 것으로 바꿉니다' : '사진을 넣습니다'}${pages}${auto}` : `새 곡${pages}`;
       note.classList.toggle('upd', !!ex);
     });
     const left = cards.filter((c) => !c.dropped && !c.done).length;
@@ -783,7 +798,16 @@ function openBatch(files, opts = {}) {
       let title = '';
       if (ocrOK) {
         setProg(i === 0 ? '제목 읽는 중… (처음 한 번은 조금 걸립니다)' : `제목 읽는 중… ${i + 1}/${files.length}`, (i + 0.5) / files.length);
-        try { title = await readTitle(r.head || r.blob, r.head ? 1 : undefined); } catch (err) { ocrOK = false; toast('제목 자동 읽기를 못 했습니다 — 직접 입력해 주세요'); }
+        try {
+          const read = await readHead(r.head || r.blob, r.head ? 1 : undefined);
+          title = read.title;
+          // 글자가 조금 틀려도 악보함에 있는 곡과 비슷하면 그 곡 제목으로 맞춤 (사진이 없는 곡을 먼저)
+          const m = matchSong(read, allSongs(), (s) => !s.pages.length);
+          if (m) {
+            if (normalize(m.song.title) !== normalize(title)) c.readAs = title;
+            title = m.song.title;
+          }
+        } catch (err) { ocrOK = false; toast('제목 자동 읽기를 못 했습니다 — 직접 입력해 주세요'); }
       }
       if (closed) return;
       if (!c.touched) {

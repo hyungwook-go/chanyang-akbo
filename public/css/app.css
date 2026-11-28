@@ -222,3 +222,7 @@ body.viewing { overflow: hidden; }
 .gatemsg { min-height: 20px; font-size: 14px; color: var(--danger); }
 .gatebox footer { margin-top: 6px; font-size: 11px; color: var(--sub); }
 .gatebox input.masked { -webkit-text-security: disc; text-security: disc; }
+
+/* 악보함: 사진이 없는 곡 안내 */
+.missingbox { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin: 0 0 12px; padding: 12px 14px; border-left: 4px solid #2e7d55; }
+.missingbox .missingbtns { display: flex; gap: 8px; flex-wrap: wrap; }
