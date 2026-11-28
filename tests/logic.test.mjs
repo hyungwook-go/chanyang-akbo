@@ -96,13 +96,19 @@ test('새 순서: 고정곡이 자동으로 들어가고, 지난주 차례를 �
 
 import { photosToDrop, oldLists, weekStart } from '../public/js/weekly.mjs';
 
-test('지난주 사진 사본만 정리 (고정곡·이번 주 순서·이번 주에 고른 사진은 남김)', () => {
+test('어느 순서에도 없는 곡의 사진만 정리 (고정곡·지난 순서 포함 모든 순서·이번 주에 고른 사진은 남김)', () => {
   const today = new Date(2026, 10, 24); // 화, 이번 주일 11/29
   const songs = [{ id: 'pin', fixed: true }, { id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
   const lists = [{ date: '2026-11-22', entries: [{ song: 'a' }, { song: 'b' }] }, { date: '2026-11-29', entries: [{ song: 'b' }] }];
   const old = new Date(2026, 10, 18).getTime();
   const photos = [{ song: 'pin', at: old }, { song: 'a', at: old }, { song: 'b', at: old }, { song: 'c', at: old }, { song: 'd', at: new Date(2026, 10, 23, 9).getTime() }];
-  assert.deepEqual(photosToDrop(songs, lists, photos, today), ['a', 'c']);
+  assert.deepEqual(photosToDrop(songs, lists, photos, today), ['c']);   // a는 지난주 순서에 있어 남김
+  // 한 주가 지나 새 순서(고정곡만)가 생겨도, 지난주 순서의 곡은 '사진 없음'이 되지 않음
+  const next = new Date(2026, 10, 30); // 월, 이번 주일 12/6
+  const withNew = [...lists, { date: '2026-12-06', entries: [{ song: 'pin' }] }];
+  assert.deepEqual(photosToDrop(songs, withNew, photos, next), ['c', 'd']);   // d는 지난주에 골랐고 어느 순서에도 없음
+  // 8주가 지나 지난 순서가 정리되면 그때 사진도 정리
+  assert.deepEqual(photosToDrop(songs, [withNew[2]], photos, next).sort(), ['a', 'b', 'c', 'd']);
   assert.equal(weekStart(new Date(2026, 10, 22)), new Date(2026, 10, 16).getTime());
 });
 

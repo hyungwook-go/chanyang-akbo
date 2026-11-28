@@ -9,7 +9,7 @@ import { sundayOf, sundayName, listDate, needsNewWeek, startEntries, photosToDro
 import { guardBack } from './back.mjs';
 import { unlocked, askPassword, showInstallOnly } from './gate.mjs';
 
-window.AKBO_VERSION = '1.0.4';
+window.AKBO_VERSION = '1.0.5';
 const main = document.getElementById('main');
 const LS_TAB = 'chanyang.tab', LS_LIST = 'chanyang.list', LS_INSTALL = 'chanyang.install', LS_WELCOME = 'chanyang.welcome';
 let tab = localStorage.getItem(LS_TAB) === 'library' ? 'library' : 'order';
@@ -281,7 +281,7 @@ async function addToList(songId) {
   return l.entries.length;
 }
 
-// 주가 바뀌면: 고정곡을 넣은 이번 주 순서를 만들고, 지난주에 쓴 사진 사본·오래된 순서를 이 기기에서 정리합니다.
+// 주가 바뀌면: 고정곡을 넣은 이번 주 순서를 만들고, 오래된 순서(8주)와 어느 순서에도 없는 곡의 사진 사본을 이 기기에서 정리합니다.
 async function weekTick() {
   if (viewerOpen || sheets.length) return;   // 반주 중이거나 등록 중에는 건드리지 않음
   let made = null;
@@ -292,14 +292,15 @@ async function weekTick() {
     if (keepSpecial) localStorage.setItem(LS_LIST, keepSpecial);   // 특별 예배를 준비 중이면 그 화면 그대로
   }
 
-  const songs = allSongs();
-  const photos = songs.filter((s) => s.pages.length).map((s) => ({ song: s.id, at: store.get('g_' + s.id).at }));
-  const drop = photosToDrop(songs, store.all('list'), photos);
-  for (const id of drop) { await dropImages(pagesOf(id)); await store.remove('g_' + id); }
+  // 오래된 순서를 먼저 정리한 뒤, 남은 순서 어디에도 없는 곡의 사진만 지움
   for (const id of oldLists(store.all('list'))) {
     await store.remove(id);
     if (localStorage.getItem(LS_LIST) === id) localStorage.removeItem(LS_LIST);
   }
+  const songs = allSongs();
+  const photos = songs.filter((s) => s.pages.length).map((s) => ({ song: s.id, at: store.get('g_' + s.id).at }));
+  const drop = photosToDrop(songs, store.all('list'), photos);
+  for (const id of drop) { await dropImages(pagesOf(id)); await store.remove('g_' + id); }
   // 어느 곡에도 쓰이지 않는 사진 사본과 표시
   const used = new Set();
   for (const s of allSongs()) for (const p of s.pages) used.add(p);
@@ -864,7 +865,7 @@ function openEditor(s, opts = {}) {
     <label class="field"><span>곡 제목</span><input data-f="title" value="${esc(s ? s.title : '')}" placeholder="예: 주 하나님 지으신 모든 세계" autocomplete="off"></label>
     <button class="bstrip hidden" data-act="preview-first" aria-label="크게 보기" style="margin-top:4px"><span>눌러서 크게 보기</span></button>
     <label class="field"><span>검색어 (선택) — 찬송가 번호, 다른 제목, 키 등</span><input data-f="keywords" value="${esc(s ? s.keywords || '' : '')}" placeholder="예: 찬송가 79장, How Great Thou Art, G키" autocomplete="off"></label>
-    <div class="small muted" style="margin:18px 0 8px">악보 사진 (넘기는 순서대로) — 원본은 사진첩에 그대로 두고, 앱은 쓰는 주에만 사본을 가지고 있다가 주가 바뀌면 지웁니다 (매주 고정곡은 남김). 둘레의 빈 여백은 자동으로 잘라 크게 보이게 합니다.</div>
+    <div class="small muted" style="margin:18px 0 8px">악보 사진 (넘기는 순서대로) — 원본은 사진첩에 그대로 두고, 앱은 사본을 가지고 있습니다. 예배 순서에 넣은 곡과 매주 고정곡의 사진은 남고, 어느 순서에도 없는 곡의 사진만 주가 바뀌면 지웁니다. 둘레의 빈 여백은 자동으로 잘라 크게 보이게 합니다.</div>
     <div class="pages"></div>`,
     `<button class="btn" data-close>취소</button><span class="grow"></span><button class="btn primary" data-act="save">저장</button>`);
   const grid = sh.$('.pages');
@@ -1040,7 +1041,7 @@ function openSettings() {
     <div class="verline"><span>앱 버전</span><b>v${window.AKBO_VERSION || ''}</b></div>
     <p class="small muted" style="margin:0 0 12px">© 2026 HM KOREA Lyoo Hyung Wook. All Rights Reserved.</p>
     <p style="margin-top:0">예배 순서·표시·악보 사진은 모두 <b>이 기기 안</b>에만 저장합니다. 서버로는 아무것도 보내지 않습니다.
-    악보 사진의 원본은 <b>사진첩(갤러리)</b>에 두고, 앱은 그 주에 쓰는 사본만 가지고 있다가 <b>주가 바뀌면 자동으로 지웁니다</b> (매주 고정곡은 남김).</p>
+    악보 사진의 원본은 <b>사진첩(갤러리)</b>에 두고, 앱은 사본을 가지고 있습니다. 예배 순서에 넣은 곡과 매주 고정곡의 사진은 남고, <b>어느 순서에도 없는 곡의 사진만</b> 주가 바뀌면 자동으로 지웁니다. 예배 순서는 8주가 지나면 정리됩니다.</p>
     <h3 style="margin:24px 0 6px;font-size:17px">쓰는 방법</h3>
     ${HOWTO}
     <h3 style="margin:24px 0 6px;font-size:17px">반주 중 화면이 꺼지지 않게</h3>
