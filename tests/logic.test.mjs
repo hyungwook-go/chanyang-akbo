@@ -207,3 +207,11 @@ test('글자 인식이 조금 틀려도 악보함의 곡과 맞춤', () => {
   const two = [{ id: 'a', title: '주의 은혜', pages: ['p'] }, { id: 'b', title: '주의 은혜라', pages: [] }];
   assert.equal(matchSong({ title: '주의 은혜리' }, two, (s) => !s.pages.length).song.id, 'b');
 });
+
+import { closestSongs } from '../public/js/search.mjs';
+
+test('제목 칸 아래 후보: 비슷한 악보함 곡을 비슷한 순으로', () => {
+  const songs = ['광야를 지나며', '주님의 영광 나타나셨네', '은혜 아니면'].map((title, i) => ({ id: 's' + i, title }));
+  assert.equal(closestSongs('공양를 지나며', songs)[0].s.title, '광야를 지나며');
+  assert.deepEqual(closestSongs('전혀 상관없는 글', songs, 3, 0.6), []);
+});

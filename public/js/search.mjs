@@ -117,3 +117,32 @@ export function matchSong(read, songs, prefer = () => false) {
   if (best.sim >= 0.85 || (best.sim >= 0.6 && best.sim - second >= 0.06)) return best;
   return null;
 }
+
+// ---- 제목 칸 아래에 보여 줄 '악보함의 이 곡인가요?' 후보 ----
+function lcsLen(a, b) {
+  let prev = new Uint16Array(b.length + 1), cur = new Uint16Array(b.length + 1);
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) cur[j] = a[i - 1] === b[j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]);
+    [prev, cur] = [cur, prev];
+  }
+  return prev[b.length];
+}
+
+// 읽은 글자와 제목이 얼마나 비슷한지 0~1 (자모로 풀어 가장 긴 공통 부분으로 비교)
+export function similarity(read, title) {
+  const a = jamo(read), b = jamo(title);
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const l = lcsLen(a, b);
+  if (!l) return 0;
+  const p = l / a.length, r = l / b.length;
+  return (2 * p * r) / (p + r);
+}
+
+// 읽은 글자와 비슷한 곡들 (비슷한 순)
+export function closestSongs(read, songs, n = 3, min = 0.35) {
+  return songs.map((s) => ({ s, sim: similarity(read, s.title) }))
+    .filter((x) => x.sim >= min)
+    .sort((x, y) => y.sim - x.sim)
+    .slice(0, n);
+}

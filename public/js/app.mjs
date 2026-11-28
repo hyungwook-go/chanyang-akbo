@@ -1,7 +1,7 @@
 // 찬양팀 악보 (배포용) — 화면 (예배 순서 / 악보함 / 등록·편집 / 설정)
 import * as store from './store.mjs';
 import * as db from './db.mjs';
-import { searchSongs, normalize, matchSong } from './search.mjs';
+import { searchSongs, normalize, matchSong, closestSongs } from './search.mjs';
 import { readHead, warmUp } from './ocr.mjs';
 import { processFile, HEAD } from './image.mjs';
 import { openViewer, forgetImage } from './viewer.mjs';
@@ -9,7 +9,7 @@ import { sundayOf, sundayName, listDate, needsNewWeek, startEntries, oldLists } 
 import { guardBack } from './back.mjs';
 import { unlocked, askPassword, showInstallOnly } from './gate.mjs';
 
-window.AKBO_VERSION = '1.0.7';
+window.AKBO_VERSION = '1.0.8';
 const main = document.getElementById('main');
 const LS_TAB = 'chanyang.tab', LS_LIST = 'chanyang.list', LS_INSTALL = 'chanyang.install', LS_WELCOME = 'chanyang.welcome';
 let tab = localStorage.getItem(LS_TAB) === 'library' ? 'library' : 'order';
@@ -687,6 +687,7 @@ function openBatch(files, opts = {}) {
           <div class="bjoin hidden">↑ 앞 곡의 다음 쪽</div>
           <input class="btitle" list="bsongs" placeholder="사진 준비 중…" autocomplete="off" autocorrect="off" spellcheck="false">
           <div class="bnote small muted"></div>
+          <div class="bsugg"></div>
         </div>
         <div class="bside">
           ${i > 0 ? '<button class="btn small" data-act="join">앞 곡에 이어 붙이기</button>' : ''}
@@ -701,6 +702,13 @@ function openBatch(files, opts = {}) {
   const progText = sh.$('.bprogtext'), progBar = sh.$('.bprog .bar i');
   const setProg = (t, f) => { progText.textContent = t; progBar.style.width = Math.round(f * 100) + '%'; };
 
+  const lib = allSongs();   // 등록 창을 연 때의 악보함 (사진 없는 곡 찾기·비슷한 제목 제안용)
+  // 제목 칸 아래에 보여 줄 악보함 곡 (눌러서 바로 고르기)
+  function candidatesFor(text) {
+    if (!text || !text.trim()) return [];
+    const found = searchSongs(lib, text).slice(0, 4);
+    return found.length ? found : closestSongs(text, lib, 4).map((x) => x.s);
+  }
   function existingFor(title) {
     const n = normalize(title);
     return n ? allSongs().find((s) => normalize(s.title) === n) : null;
@@ -731,14 +739,21 @@ function openBatch(files, opts = {}) {
       const jb = el.querySelector('[data-act=join]');
       if (jb) jb.textContent = isHead ? '앞 곡에 이어 붙이기' : '따로 떼기';
       const note = el.querySelector('.bnote');
-      if (!isHead) { note.textContent = ''; return; }
-      if (!c.done) { note.textContent = ''; return; }
+      const sugg = el.querySelector('.bsugg');
+      if (!isHead || !c.done) { note.textContent = ''; sugg.innerHTML = ''; return; }
       const ex = existingFor(c.title);
       const pages = h.pages.length > 1 ? ` · ${h.pages.length}쪽` : '';
-      const auto = ex && c.readAs && !c.touched ? ` (읽은 글자 ‘${c.readAs}’ → 비슷한 곡으로 맞춤)` : '';
-      note.textContent = !c.title.trim() ? '제목을 입력해 주세요'
-        : ex ? `이미 있는 곡 — ${ex.pages.length ? '사진만 새 것으로 바꿉니다' : '사진을 넣습니다'}${pages}${auto}` : `새 곡${pages}`;
+      const readNote = c.matched && c.read && normalize(c.read) !== normalize(c.title) ? ` (읽은 글자: ${c.read})` : '';
+      note.textContent = !c.title.trim() ? '제목을 입력하거나 아래에서 고르세요'
+        : ex ? (ex.pages.length ? `이미 있는 곡 — 사진만 새 것으로 바꿉니다${pages}` : `악보함 곡에 사진을 다시 넣습니다${pages}${readNote}`)
+        : `새 곡${pages}`;
       note.classList.toggle('upd', !!ex);
+      // 악보함에 똑같은 제목이 없으면 비슷한 곡을 보여 줌
+      const cands = ex ? [] : (c.cands || []);
+      c.shown = cands;
+      sugg.innerHTML = cands.length
+        ? `<span class="small muted">악보함의 이 곡인가요?</span>` + cands.map((s, k) => `<button class="sugg" data-act="sugg" data-n="${k}">${esc(s.title)}${s.pages && s.pages.length ? '' : ' <small>사진 없음</small>'}</button>`).join('')
+        : '';
     });
     const left = cards.filter((c) => !c.dropped && !c.done).length;
     saveBtn.disabled = left > 0 || !hs.length;
@@ -751,6 +766,7 @@ function openBatch(files, opts = {}) {
     const c = cards[Number(el.dataset.i)];
     c.title = e.target.value;
     c.touched = true;
+    c.cands = candidatesFor(c.title);
     refresh();
   });
   sh.root.addEventListener('click', async (e) => {
@@ -764,6 +780,13 @@ function openBatch(files, opts = {}) {
     }
     else if (b.dataset.act === 'join') { cards[i].join = !cards[i].join; refresh(); }
     else if (b.dataset.act === 'drop') { cards[i].dropped = true; refresh(); }
+    else if (b.dataset.act === 'sugg') {
+      const c = cards[i], s = (c.shown || [])[Number(b.dataset.n)];
+      if (!s) return;
+      c.title = s.title; c.touched = true; c.cands = [];
+      el.querySelector('.btitle').value = s.title;
+      refresh();
+    }
     else if (b.dataset.act === 'save') save();
   });
 
@@ -795,27 +818,31 @@ function openBatch(files, opts = {}) {
       strip.style.aspectRatio = `${r.w} / ${Math.max(1, Math.round(r.h * 0.28))}`;
       refresh();
       if (!c.touched) input.placeholder = '제목 읽는 중…';
-      let title = '';
+      let title = '', read = null;
       if (ocrOK) {
         setProg(i === 0 ? '제목 읽는 중… (처음 한 번은 조금 걸립니다)' : `제목 읽는 중… ${i + 1}/${files.length}`, (i + 0.5) / files.length);
         try {
-          const read = await readHead(r.head || r.blob, r.head ? 1 : undefined);
+          read = await readHead(r.head || r.blob, r.head ? 1 : undefined);
           title = read.title;
-          // 글자가 조금 틀려도 악보함에 있는 곡과 비슷하면 그 곡 제목으로 맞춤 (사진이 없는 곡을 먼저)
-          const m = matchSong(read, allSongs(), (s) => !s.pages.length);
-          if (m) {
-            if (normalize(m.song.title) !== normalize(title)) c.readAs = title;
-            title = m.song.title;
-          }
         } catch (err) { ocrOK = false; toast('제목 자동 읽기를 못 했습니다 — 직접 입력해 주세요'); }
       }
       if (closed) return;
       if (!c.touched) {
+        const prevHead = heads().filter((h) => h.i < i).pop();
+        // 읽은 글자가 조금 틀려도(일부만 읽혀도), 사진 없는 악보함 곡과 확실히 비슷하면 그 제목으로 맞춤.
+        // 사진이 있는 곡은 실수로 바뀌지 않게 아래 '이 곡인가요?'로 고르게만 함.
+        // 이번 등록에서 이미 다른 장에 맞춘 곡은 빼되, 바로 앞 곡은 다음 쪽일 수 있으니 남김
+        c.read = title;
+        if (read && !existingFor(title)) {
+          const taken = new Set(heads().filter((h) => h.i < i && h !== prevHead).map((h) => normalize(cards[h.i].title)));
+          const m = matchSong(read, lib.filter((s) => !s.pages.length && !taken.has(normalize(s.title))));
+          if (m) { title = m.song.title; c.matched = true; }
+        }
+        c.cands = candidatesFor(c.read);
         c.title = title;
         input.value = title;
         input.placeholder = '곡 제목을 입력하세요';
         // 앞 장과 제목이 같으면 같은 곡의 다음 쪽으로 봄
-        const prevHead = heads().filter((h) => h.i < i).pop();
         if (title && prevHead && normalize(cards[prevHead.i].title) === normalize(title)) c.join = true;
       }
       c.done = true;

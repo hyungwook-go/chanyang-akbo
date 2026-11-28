@@ -226,3 +226,8 @@ body.viewing { overflow: hidden; }
 /* 악보함: 사진이 없는 곡 안내 */
 .missingbox { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin: 0 0 12px; padding: 12px 14px; border-left: 4px solid #2e7d55; }
 .missingbox .missingbtns { display: flex; gap: 8px; flex-wrap: wrap; }
+/* 등록 화면: '악보함의 이 곡인가요?' 후보 */
+.bsugg { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.bsugg:empty { display: none; }
+.sugg { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #2e7d55; background: #fff; color: #2e7d55; font-size: 16px; font-weight: 600; }
+.sugg small { color: #b4472f; font-weight: 500; margin-left: 4px; }
